@@ -57,11 +57,11 @@
                         <option value="all">Tất cả năm học</option>
                     </select>
 
-                    <!-- BỘ LỌC TÁC GIẢ -->
-                    <select id="filter-author" class="border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm max-w-[180px]">
-                        <option value="all">Tất cả tác giả</option>
-                        <!-- Option sẽ được JS tự động thêm vào -->
-                    </select>
+                    <!-- BỘ LỌC TÁC GIẢ TÌM KIẾM -->
+                    <div class="relative w-full md:w-48">
+                        <input type="text" id="filter-author" list="author-list" placeholder="Lọc theo tác giả..." class="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                        <datalist id="author-list"></datalist>
+                    </div>
 
                     <div class="relative w-full md:w-64">
                         <input type="text" id="search-input" placeholder="Tìm tên bài, tác giả..." class="w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
@@ -90,6 +90,10 @@
                     </thead>
                     <tbody id="table-body"></tbody>
                 </table>
+                
+                <!-- KHUNG PHÂN TRANG -->
+                <div id="pagination-controls" class="flex flex-col md:flex-row justify-between items-center p-4 bg-gray-50 border-t"></div>
+
                 <div id="empty-state" class="hidden p-8 text-center text-gray-500">
                     <i class="fas fa-box-open text-4xl mb-3 text-gray-300"></i><br>
                     Không tìm thấy dữ liệu phù hợp.

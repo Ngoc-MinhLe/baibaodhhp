@@ -7,6 +7,11 @@ let currentUserData = null;
 let userPerms = {}; 
 let allArticles = []; // Lưu trữ toàn bộ bài báo để lọc ở Client
 let categoriesData = [];
+let dbAuthors = []; // Lưu trữ danh sách Tác giả từ DB
+
+let currentPage = 1;
+const itemsPerPage = 10;
+window.selectedArticleIds = new Set(); // Giữ lại checkbox khi chuyển trang
 const HOME_PATH = '../'; 
 
 // --- KHỞI TẠO ---
@@ -35,6 +40,7 @@ requireAuth(async (user, userData) => {
     setupUI(); 
     loadCategories();
     loadYears();
+    loadDbAuthors();
     loadData();
 }, HOME_PATH);
 
@@ -79,6 +85,16 @@ async function loadYears() {
     });
 }
 
+// --- TẢI DANH SÁCH TÁC GIẢ TỪ QUẢN LÝ ---
+async function loadDbAuthors() {
+    onSnapshot(query(collection(db, 'authors')), (snapshot) => {
+        dbAuthors = [];
+        snapshot.forEach(docSnap => {
+            dbAuthors.push({ id: docSnap.id, ...docSnap.data() });
+        });
+    });
+}
+
 // --- TẢI DỮ LIỆU ---
 function loadData() {
     const ref = collection(db, 'articles');
@@ -101,7 +117,7 @@ function loadData() {
         if (hasPermission(userPerms, 'articles', 'view_all')) {
             updateAuthorFilterOptions();
         } else {
-            document.getElementById('filter-author').classList.add('hidden'); // Ẩn filter nếu chỉ xem bài mình
+            document.getElementById('filter-author').parentElement.classList.add('hidden'); // Ẩn filter nếu chỉ xem bài mình
         }
 
         // Cập nhật bộ lọc Năm học
@@ -112,23 +128,21 @@ function loadData() {
     });
 }
 
-// Cập nhật Dropdown chọn Tác giả
+// Cập nhật Datalist Tác giả (Gộp từ DB và Bài báo)
 function updateAuthorFilterOptions() {
-    const select = document.getElementById('filter-author');
-    const currentVal = select.value;
+    const datalist = document.getElementById('author-list');
     
-    const allAuthors = allArticles.flatMap(item => Array.isArray(item.tacGia) ? item.tacGia : [item.tacGia]).map(a => a ? a.trim() : '').filter(a => a !== '');
-    const uniqueAuthors = [...new Set(allAuthors)].sort();
+    // Gộp tác giả từ bài báo cũ và tác giả trong DB quản lý
+    const articleAuthors = allArticles.flatMap(item => Array.isArray(item.tacGia) ? item.tacGia : [item.tacGia]).map(a => a ? a.trim() : '');
+    const manageAuthors = dbAuthors.map(a => a.name.trim());
+    const uniqueAuthors = [...new Set([...articleAuthors, ...manageAuthors])].filter(a => a !== '').sort();
     
-    let html = '<option value="all">Tất cả tác giả</option>';
+    let html = '';
     uniqueAuthors.forEach(author => {
          html += `<option value="${author}">${author}</option>`;
     });
     
-    select.innerHTML = html;
-    if (uniqueAuthors.includes(currentVal) || currentVal === 'all') {
-        select.value = currentVal;
-    }
+    datalist.innerHTML = html;
 }
 
 // Cập nhật Dropdown chọn Năm học
@@ -153,8 +167,10 @@ function updateYearFilterOptions() {
 function renderTable() {
     const tbody = document.getElementById('table-body');
     const emptyState = document.getElementById('empty-state');
+    const paginationControls = document.getElementById('pagination-controls');
+    
     const searchTerm = document.getElementById('search-input').value.toLowerCase();
-    const filterAuthor = document.getElementById('filter-author').value;
+    const filterAuthor = document.getElementById('filter-author').value.trim().toLowerCase();
     const filterYear = document.getElementById('filter-year').value;
 
     tbody.innerHTML = '';
@@ -166,26 +182,62 @@ function renderTable() {
                               (item.tacGia || '').toLowerCase().includes(searchTerm) ||
                               (item.ghiChu || '').toLowerCase().includes(searchTerm); // Cho phép tìm kiếm cả trong ghi chú
         
-        const matchesAuthor = filterAuthor === 'all' || (Array.isArray(item.tacGia) 
-                              ? item.tacGia.map(a => a.trim()).includes(filterAuthor) 
-                              : (item.tacGia || '').trim() === filterAuthor);
+        const matchesAuthor = filterAuthor === '' || (Array.isArray(item.tacGia) 
+                              ? item.tacGia.map(a => a.trim().toLowerCase()).includes(filterAuthor) 
+                              : (item.tacGia || '').trim().toLowerCase() === filterAuthor);
         const matchesYear = filterYear === 'all' || item.namHoc === filterYear;
 
         return matchesSearch && matchesAuthor && matchesYear;
     });
 
+    // Tính tổng giờ TRƯỚC KHI cắt trang
+    filteredData.forEach(item => totalSum += getMyHoursValue(item));
+    document.getElementById('total-hours-display').textContent = Number(totalSum.toFixed(2));
+
     if (filteredData.length === 0) {
         emptyState.classList.remove('hidden');
+        paginationControls.innerHTML = '';
     } else {
         emptyState.classList.add('hidden');
-        filteredData.forEach((item, index) => {
-            totalSum += getMyHoursValue(item);
-            renderRow(item, index + 1, tbody);
+        
+        // Cắt dữ liệu theo trang
+        const totalItems = filteredData.length;
+        const totalPages = Math.ceil(totalItems / itemsPerPage);
+        if (currentPage > totalPages) currentPage = totalPages;
+        
+        const paginatedData = filteredData.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+        
+        paginatedData.forEach((item, index) => {
+            const stt = (currentPage - 1) * itemsPerPage + index + 1;
+            renderRow(item, stt, tbody);
         });
+        
+        renderPagination(totalItems, totalPages, paginationControls);
+    }
+}
+
+// Phân trang
+function renderPagination(totalItems, totalPages, container) {
+    if (totalPages <= 1) { container.innerHTML = ''; return; }
+    
+    let html = `<div class="text-sm text-gray-600 mb-2 md:mb-0">Đang xem ${(currentPage-1)*itemsPerPage + 1} - ${Math.min(currentPage*itemsPerPage, totalItems)} trong tổng số ${totalItems} kết quả</div>`;
+    html += `<div class="flex space-x-1">`;
+    
+    html += `<button onclick="window.changePage(${currentPage > 1 ? currentPage - 1 : 1})" class="px-3 py-1 border rounded ${currentPage === 1 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white hover:bg-gray-50'}"><i class="fas fa-chevron-left"></i></button>`;
+    
+    let startPage = Math.max(1, currentPage - 2);
+    let endPage = Math.min(totalPages, currentPage + 2);
+    
+    for (let i = startPage; i <= endPage; i++) {
+        html += `<button onclick="window.changePage(${i})" class="px-3 py-1 border rounded ${i === currentPage ? 'bg-blue-600 text-white font-bold' : 'bg-white hover:bg-gray-50'}">${i}</button>`;
     }
     
-    document.getElementById('total-hours-display').textContent = Number(totalSum.toFixed(2));
+    html += `<button onclick="window.changePage(${currentPage < totalPages ? currentPage + 1 : totalPages})" class="px-3 py-1 border rounded ${currentPage === totalPages ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white hover:bg-gray-50'}"><i class="fas fa-chevron-right"></i></button>`;
+    html += `</div>`;
+    container.innerHTML = html;
 }
+
+window.changePage = (page) => { currentPage = page; renderTable(); };
 
 // Lấy giá trị số giờ để tính tổng
 function getMyHoursValue(item) {
@@ -262,7 +314,7 @@ function renderRow(item, index, tbody) {
 
     tr.innerHTML = `
         <td class="text-center py-3">
-            <input type="checkbox" class="select-row w-4 h-4 text-blue-600 rounded cursor-pointer" value="${item.id}">
+            <input type="checkbox" class="select-row w-4 h-4 text-blue-600 rounded cursor-pointer" value="${item.id}" ${window.selectedArticleIds.has(item.id) ? 'checked' : ''} onchange="window.toggleSelection(this)">
         </td>
         <td class="text-center py-3 text-gray-500">${index}</td>
         <td class="px-4 py-3 font-semibold text-blue-900">
@@ -280,12 +332,23 @@ function renderRow(item, index, tbody) {
 }
 
 // --- SỰ KIỆN LỌC ---
-document.getElementById('search-input').addEventListener('keyup', renderTable);
-document.getElementById('filter-author').addEventListener('change', renderTable);
-document.getElementById('filter-year').addEventListener('change', renderTable);
+const resetPageAndRender = () => { currentPage = 1; renderTable(); };
+document.getElementById('search-input').addEventListener('keyup', resetPageAndRender);
+document.getElementById('filter-author').addEventListener('input', resetPageAndRender);
+document.getElementById('filter-year').addEventListener('change', resetPageAndRender);
+
+window.toggleSelection = (cb) => {
+    if(cb.checked) window.selectedArticleIds.add(cb.value);
+    else window.selectedArticleIds.delete(cb.value);
+};
 
 document.getElementById('select-all').addEventListener('change', (e) => {
-    document.querySelectorAll('.select-row').forEach(cb => cb.checked = e.target.checked);
+    const isChecked = e.target.checked;
+    document.querySelectorAll('.select-row').forEach(cb => {
+        cb.checked = isChecked;
+        if(isChecked) window.selectedArticleIds.add(cb.value);
+        else window.selectedArticleIds.delete(cb.value);
+    });
 });
 
 // --- CHẾ ĐỘ IN ẤN THÔNG MINH ---
@@ -298,21 +361,21 @@ window.togglePreview = () => {
         p.classList.remove('preview-mode');
         m.classList.remove('hidden'); m.classList.add('flex');
     } else {
-        const checkedIds = Array.from(document.querySelectorAll('.select-row:checked')).map(cb => cb.value);
+        const checkedIds = Array.from(window.selectedArticleIds);
         let itemsToPrint = [];
         if (checkedIds.length > 0) {
             itemsToPrint = allArticles.filter(item => checkedIds.includes(item.id));
         } else {
             const searchTerm = document.getElementById('search-input').value.toLowerCase();
-            const filterAuthor = document.getElementById('filter-author').value;
+            const filterAuthor = document.getElementById('filter-author').value.trim().toLowerCase();
             const filterYear = document.getElementById('filter-year').value;
             itemsToPrint = allArticles.filter(item => {
                 const matchesSearch = (item.tenBai || '').toLowerCase().includes(searchTerm) || 
                                       (item.tacGia || '').toLowerCase().includes(searchTerm) ||
                                       (item.ghiChu || '').toLowerCase().includes(searchTerm);
-                const matchesAuthor = filterAuthor === 'all' || (Array.isArray(item.tacGia) 
-                                      ? item.tacGia.map(a => a.trim()).includes(filterAuthor) 
-                                      : (item.tacGia || '').trim() === filterAuthor);
+                const matchesAuthor = filterAuthor === '' || (Array.isArray(item.tacGia) 
+                                      ? item.tacGia.map(a => a.trim().toLowerCase()).includes(filterAuthor) 
+                                      : (item.tacGia || '').trim().toLowerCase() === filterAuthor);
                 const matchesYear = filterYear === 'all' || item.namHoc === filterYear;
                 return matchesSearch && matchesAuthor && matchesYear;
             });
@@ -369,7 +432,7 @@ window.addAuthorField = (val = '', isMain = false, isFirst = false) => {
 
     div.innerHTML = `
         <input type="radio" name="main-author" class="main-author-radio w-4 h-4 text-blue-600 focus:ring-blue-500 cursor-pointer flex-shrink-0" ${isMain ? 'checked' : ''} title="Đánh dấu là tác giả chính">
-        <input type="text" class="author-input w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Tên tác giả" value="${val}" required>
+        <input type="text" list="author-list" class="author-input w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Tên tác giả (gõ để tìm)" value="${val}" required autocomplete="off">
         ${btn}
     `;
     container.appendChild(div);
@@ -436,6 +499,13 @@ document.getElementById('form-article').addEventListener('submit', async (e) => 
     // Nếu vì lý do nào đó không có ai được chọn, mặc định lấy người đầu tiên
     if (!tacGiaChinh && tacGiaArray.length > 0) tacGiaChinh = tacGiaArray[0];
     
+    // ĐỒNG BỘ: Tự động thêm Tác giả mới vào Quản lý Tác giả
+    for (const a of tacGiaArray) {
+        if (!dbAuthors.some(dbA => dbA.name.toLowerCase() === a.toLowerCase())) {
+            try { await addDoc(collection(db, 'authors'), { name: a }); } catch(e){}
+        }
+    }
+
     const danhMucSelect = document.getElementById('danh-muc');
     const selectedOption = danhMucSelect.options[danhMucSelect.selectedIndex];
 
