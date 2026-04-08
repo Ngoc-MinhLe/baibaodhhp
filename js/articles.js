@@ -195,7 +195,9 @@ function getMyHoursValue(item) {
     
     // So sánh tên (không phân biệt hoa thường)
     const myName = (currentUserData.authorName || currentUser.displayName || "").trim().toLowerCase();
-    let isMain = authors.length > 0 && authors[0].trim().toLowerCase() === myName;
+    const mainAuthorName = (item.tacGiaChinh || authors[0] || "").trim().toLowerCase();
+
+    let isMain = mainAuthorName === myName;
     let isCoAuthor = !isMain && authors.some(a => a.trim().toLowerCase() === myName);
 
     if (isMain) {
@@ -213,7 +215,9 @@ function calculateMyHoursDisplay(item, returnType = 'html') {
     const authors = Array.isArray(item.tacGia) ? item.tacGia : [item.tacGia];
     
     const myName = (currentUserData.authorName || currentUser.displayName || "").trim().toLowerCase();
-    let isMain = authors.length > 0 && authors[0].trim().toLowerCase() === myName;
+    const mainAuthorName = (item.tacGiaChinh || authors[0] || "").trim().toLowerCase();
+
+    let isMain = mainAuthorName === myName;
     let isCoAuthor = !isMain && authors.some(a => a.trim().toLowerCase() === myName);
 
     let myHours = getMyHoursValue(item);
@@ -249,8 +253,9 @@ function renderRow(item, index, tbody) {
     // Hiển thị ghi chú nhỏ bên dưới tên bài báo (nếu có)
     const noteHtml = item.ghiChu ? `<div class="text-xs text-gray-500 mt-1"><i class="fas fa-info-circle mr-1"></i>${item.ghiChu}</div>` : '';
     
-    // Xử lý hiển thị tác giả
-    let tacGiaDisplay = Array.isArray(item.tacGia) ? item.tacGia.join(', ') : item.tacGia;
+    // Xử lý hiển thị tác giả (In đậm và gạch chân tác giả chính)
+    let mainAuthorName = item.tacGiaChinh || (Array.isArray(item.tacGia) ? item.tacGia[0] : item.tacGia);
+    let tacGiaDisplay = Array.isArray(item.tacGia) ? item.tacGia.map(a => a === mainAuthorName ? `<span class="font-bold underline text-blue-800" title="Tác giả chính">${a}</span>` : a).join(', ') : item.tacGia;
     
     // Tính số giờ hiển thị
     const hoursDisplay = calculateMyHoursDisplay(item, 'html');
@@ -323,7 +328,8 @@ window.togglePreview = () => {
         itemsToPrint.forEach(item => {
             // Hiển thị ghi chú trong bảng in (nếu có)
             const notePrint = item.ghiChu ? `<br><span style="font-style: italic; font-size: 0.9em; color: #555;">(Ghi chú: ${item.ghiChu})</span>` : '';
-            const tgPrint = Array.isArray(item.tacGia) ? item.tacGia.join(', ') : item.tacGia;
+            const mainA = item.tacGiaChinh || (Array.isArray(item.tacGia) ? item.tacGia[0] : item.tacGia);
+            const tgPrint = Array.isArray(item.tacGia) ? item.tacGia.map(a => a === mainA ? `<u><b>${a}</b></u>` : a).join(', ') : item.tacGia;
             const printHours = calculateMyHoursDisplay(item, 'print');
 
             printBody.insertAdjacentHTML('beforeend', `
@@ -352,13 +358,19 @@ window.togglePreview = () => {
 };
 
 // --- CRUD ---
-window.addAuthorField = (val = '') => {
+window.addAuthorField = (val = '', isMain = false, isFirst = false) => {
     const container = document.getElementById('authors-container');
     const div = document.createElement('div');
-    div.className = "flex items-center gap-2 mt-2";
+    div.className = `flex items-center gap-2 author-row ${isFirst ? '' : 'mt-2'}`;
+    
+    const btn = isFirst 
+        ? `<button type="button" onclick="window.addAuthorField()" class="bg-blue-100 text-blue-600 px-3 py-2 rounded hover:bg-blue-200" title="Thêm tác giả"><i class="fas fa-plus"></i></button>`
+        : `<button type="button" onclick="this.parentElement.remove()" class="bg-red-100 text-red-600 px-3 py-2 rounded hover:bg-red-200" title="Xóa tác giả này"><i class="fas fa-minus"></i></button>`;
+
     div.innerHTML = `
-        <input type="text" class="author-input w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Đồng tác giả" value="${val}" required>
-        <button type="button" onclick="this.parentElement.remove()" class="bg-red-100 text-red-600 px-3 py-2 rounded hover:bg-red-200"><i class="fas fa-minus"></i></button>
+        <input type="radio" name="main-author" class="main-author-radio w-4 h-4 text-blue-600 focus:ring-blue-500 cursor-pointer flex-shrink-0" ${isMain ? 'checked' : ''} title="Đánh dấu là tác giả chính">
+        <input type="text" class="author-input w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Tên tác giả" value="${val}" required>
+        ${btn}
     `;
     container.appendChild(div);
 };
@@ -370,12 +382,7 @@ window.openModal = (id = null) => {
     document.getElementById('modal-title').textContent = "Thêm Mới";
     
     // Reset authors container
-    document.getElementById('authors-container').innerHTML = `
-        <div class="flex items-center gap-2">
-            <input type="text" class="author-input w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Tên tác giả chính" required>
-            <button type="button" onclick="window.addAuthorField()" class="bg-blue-100 text-blue-600 px-3 py-2 rounded hover:bg-blue-200"><i class="fas fa-plus"></i></button>
-        </div>
-    `;
+    document.getElementById('authors-container').innerHTML = '';
 
     if (id) {
         editId = id;
@@ -394,15 +401,17 @@ window.openModal = (id = null) => {
             
             // Load Authors
             let authors = Array.isArray(item.tacGia) ? item.tacGia : [item.tacGia];
-            if(authors.length > 0) {
-                document.querySelector('.author-input').value = authors[0];
-                for(let i = 1; i < authors.length; i++) {
-                    window.addAuthorField(authors[i]);
-                }
-            }
+            if(authors.length === 0) authors = [''];
+            let mainAuthor = item.tacGiaChinh || authors[0];
+            
+            authors.forEach((a, index) => {
+                window.addAuthorField(a, a === mainAuthor, index === 0);
+            });
             
             document.getElementById('modal-title').textContent = "Cập Nhật";
         }
+    } else {
+        window.addAuthorField('', true, true);
     }
     document.getElementById('article-modal').classList.remove('hidden');
 };
@@ -411,8 +420,21 @@ window.closeModal = () => document.getElementById('article-modal').classList.add
 document.getElementById('form-article').addEventListener('submit', async (e) => {
     e.preventDefault();
     
-    const authorInputs = document.querySelectorAll('.author-input');
-    const tacGiaArray = Array.from(authorInputs).map(i => i.value.trim()).filter(v => v !== '');
+    const authorRows = document.querySelectorAll('.author-row');
+    let tacGiaArray = [];
+    let tacGiaChinh = "";
+
+    authorRows.forEach(row => {
+        const input = row.querySelector('.author-input').value.trim();
+        const isMain = row.querySelector('.main-author-radio').checked;
+        if (input !== '') {
+            tacGiaArray.push(input);
+            if (isMain) tacGiaChinh = input;
+        }
+    });
+    
+    // Nếu vì lý do nào đó không có ai được chọn, mặc định lấy người đầu tiên
+    if (!tacGiaChinh && tacGiaArray.length > 0) tacGiaChinh = tacGiaArray[0];
     
     const danhMucSelect = document.getElementById('danh-muc');
     const selectedOption = danhMucSelect.options[danhMucSelect.selectedIndex];
@@ -420,6 +442,7 @@ document.getElementById('form-article').addEventListener('submit', async (e) => 
     const data = {
         tenBai: document.getElementById('ten-bai').value,
         tacGia: tacGiaArray,
+        tacGiaChinh: tacGiaChinh,
         noiCongBo: document.getElementById('noi-cong-bo').value,
         namHoc: document.getElementById('nam-hoc').value,
         danhMuc: selectedOption ? selectedOption.value : '',
