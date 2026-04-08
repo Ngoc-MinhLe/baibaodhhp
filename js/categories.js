@@ -3,6 +3,7 @@ import { collection, addDoc, doc, updateDoc, deleteDoc, query, onSnapshot, order
 import { requireAuth, setupLogoutButton, hasPermission } from './common.js';
 
 let allCategories = [];
+let allAuthors = [];
 const HOME_PATH = '../';
 
 requireAuth(async (user, userData) => {
@@ -20,6 +21,7 @@ requireAuth(async (user, userData) => {
     setupLogoutButton(HOME_PATH);
     
     loadCategories();
+    loadAuthors();
 }, HOME_PATH);
 
 function loadCategories() {
@@ -103,6 +105,76 @@ window.deleteItem = async (id) => {
     if(confirm("Bạn có chắc chắn muốn xóa danh mục này?")) {
         await deleteDoc(doc(collection(db, 'categories'), id));
     }
+};
+
+// --- QUẢN LÝ TÁC GIẢ ---
+function loadAuthors() {
+    const q = query(collection(db, 'authors'), orderBy("name", "asc"));
+    
+    onSnapshot(q, (snapshot) => {
+        allAuthors = [];
+        snapshot.forEach(docSnap => {
+            allAuthors.push({ id: docSnap.id, ...docSnap.data() });
+        });
+        renderAuthorTable();
+    });
+}
+
+function renderAuthorTable() {
+    const tbody = document.getElementById('author-table-body');
+    const emptyState = document.getElementById('author-empty-state');
+
+    tbody.innerHTML = '';
+
+    if (allAuthors.length === 0) {
+        emptyState.classList.remove('hidden');
+    } else {
+        emptyState.classList.add('hidden');
+        allAuthors.forEach((item, index) => {
+            const tr = document.createElement('tr');
+            tr.className = "border-b hover:bg-gray-50 transition";
+            tr.innerHTML = `
+                <td class="text-center py-3 text-gray-500">${index + 1}</td>
+                <td class="px-5 py-3 font-semibold text-blue-900">${item.name}</td>
+                <td class="text-center">
+                    <button class="text-blue-600 mr-3 hover:text-blue-800" onclick="window.openAuthorModal('${item.id}')"><i class="fas fa-edit"></i></button>
+                    <button class="text-red-600 hover:text-red-800" onclick="window.deleteAuthor('${item.id}')"><i class="fas fa-trash"></i></button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+}
+
+let editAuthorId = null;
+window.openAuthorModal = (id = null) => {
+    document.getElementById('form-author').reset();
+    editAuthorId = null;
+    document.getElementById('author-modal-title').textContent = "Thêm Tác Giả";
+    if (id) {
+        editAuthorId = id;
+        const item = allAuthors.find(x => x.id === id);
+        if (item) {
+            document.getElementById('author-name').value = item.name;
+            document.getElementById('author-modal-title').textContent = "Cập Nhật Tác Giả";
+        }
+    }
+    document.getElementById('author-modal').classList.remove('hidden');
+};
+window.closeAuthorModal = () => document.getElementById('author-modal').classList.add('hidden');
+
+document.getElementById('form-author').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const data = { name: document.getElementById('author-name').value.trim() };
+    try {
+        if (editAuthorId) await updateDoc(doc(collection(db, 'authors'), editAuthorId), data);
+        else await addDoc(collection(db, 'authors'), data);
+        closeAuthorModal();
+    } catch (err) { alert("Lỗi: " + err.message); }
+});
+
+window.deleteAuthor = async (id) => { 
+    if(confirm("Bạn có chắc chắn muốn xóa tác giả này?")) await deleteDoc(doc(collection(db, 'authors'), id));
 };
 
 window.seedDefaultCategories = async () => {

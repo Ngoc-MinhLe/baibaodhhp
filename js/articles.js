@@ -97,11 +97,11 @@ function loadData() {
             allArticles.push({ id: docSnap.id, ...docSnap.data() });
         });
 
-        // 1. Cập nhật bộ lọc User (Nếu xem all)
+        // 1. Cập nhật bộ lọc Tác giả (Nếu xem all)
         if (hasPermission(userPerms, 'articles', 'view_all')) {
-            updateUserFilterOptions();
+            updateAuthorFilterOptions();
         } else {
-            document.getElementById('filter-user').classList.add('hidden'); // Ẩn filter user nếu chỉ xem bài mình
+            document.getElementById('filter-author').classList.add('hidden'); // Ẩn filter nếu chỉ xem bài mình
         }
 
         // Cập nhật bộ lọc Năm học
@@ -112,22 +112,23 @@ function loadData() {
     });
 }
 
-// Cập nhật Dropdown chọn User
-function updateUserFilterOptions() {
-    const select = document.getElementById('filter-user');
+// Cập nhật Dropdown chọn Tác giả
+function updateAuthorFilterOptions() {
+    const select = document.getElementById('filter-author');
     const currentVal = select.value;
     
-    const uniqueEmails = [...new Set(allArticles.map(item => item.createdEmail || "Không rõ"))];
+    const allAuthors = allArticles.flatMap(item => Array.isArray(item.tacGia) ? item.tacGia : [item.tacGia]).map(a => a ? a.trim() : '').filter(a => a !== '');
+    const uniqueAuthors = [...new Set(allAuthors)].sort();
     
-    let html = '<option value="all">Tất cả tài khoản</option>';
-    uniqueEmails.forEach(email => {
-        if(email !== "Không rõ") {
-             html += `<option value="${email}">${email}</option>`;
-        }
+    let html = '<option value="all">Tất cả tác giả</option>';
+    uniqueAuthors.forEach(author => {
+         html += `<option value="${author}">${author}</option>`;
     });
     
     select.innerHTML = html;
-    select.value = currentVal;
+    if (uniqueAuthors.includes(currentVal) || currentVal === 'all') {
+        select.value = currentVal;
+    }
 }
 
 // Cập nhật Dropdown chọn Năm học
@@ -153,7 +154,7 @@ function renderTable() {
     const tbody = document.getElementById('table-body');
     const emptyState = document.getElementById('empty-state');
     const searchTerm = document.getElementById('search-input').value.toLowerCase();
-    const filterUser = document.getElementById('filter-user').value;
+    const filterAuthor = document.getElementById('filter-author').value;
     const filterYear = document.getElementById('filter-year').value;
 
     tbody.innerHTML = '';
@@ -165,10 +166,12 @@ function renderTable() {
                               (item.tacGia || '').toLowerCase().includes(searchTerm) ||
                               (item.ghiChu || '').toLowerCase().includes(searchTerm); // Cho phép tìm kiếm cả trong ghi chú
         
-        const matchesUser = filterUser === 'all' || item.createdEmail === filterUser;
+        const matchesAuthor = filterAuthor === 'all' || (Array.isArray(item.tacGia) 
+                              ? item.tacGia.map(a => a.trim()).includes(filterAuthor) 
+                              : (item.tacGia || '').trim() === filterAuthor);
         const matchesYear = filterYear === 'all' || item.namHoc === filterYear;
 
-        return matchesSearch && matchesUser && matchesYear;
+        return matchesSearch && matchesAuthor && matchesYear;
     });
 
     if (filteredData.length === 0) {
@@ -273,7 +276,7 @@ function renderRow(item, index, tbody) {
 
 // --- SỰ KIỆN LỌC ---
 document.getElementById('search-input').addEventListener('keyup', renderTable);
-document.getElementById('filter-user').addEventListener('change', renderTable);
+document.getElementById('filter-author').addEventListener('change', renderTable);
 document.getElementById('filter-year').addEventListener('change', renderTable);
 
 document.getElementById('select-all').addEventListener('change', (e) => {
@@ -296,15 +299,17 @@ window.togglePreview = () => {
             itemsToPrint = allArticles.filter(item => checkedIds.includes(item.id));
         } else {
             const searchTerm = document.getElementById('search-input').value.toLowerCase();
-            const filterUser = document.getElementById('filter-user').value;
+            const filterAuthor = document.getElementById('filter-author').value;
             const filterYear = document.getElementById('filter-year').value;
             itemsToPrint = allArticles.filter(item => {
                 const matchesSearch = (item.tenBai || '').toLowerCase().includes(searchTerm) || 
                                       (item.tacGia || '').toLowerCase().includes(searchTerm) ||
                                       (item.ghiChu || '').toLowerCase().includes(searchTerm);
-                const matchesUser = filterUser === 'all' || item.createdEmail === filterUser;
+                const matchesAuthor = filterAuthor === 'all' || (Array.isArray(item.tacGia) 
+                                      ? item.tacGia.map(a => a.trim()).includes(filterAuthor) 
+                                      : (item.tacGia || '').trim() === filterAuthor);
                 const matchesYear = filterYear === 'all' || item.namHoc === filterYear;
-                return matchesSearch && matchesUser && matchesYear;
+                return matchesSearch && matchesAuthor && matchesYear;
             });
         }
 

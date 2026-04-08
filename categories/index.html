@@ -5,7 +5,7 @@
     <link rel="icon" type="image/png" href="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRjTnSBGofmGpcMY_uEoXhgAB-FeeLjVslu1A&s">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Quản Lý Danh Mục Bài Báo - ĐH Hải Phòng</title>
+    <title>Quản Lý Danh Mục & Tác Giả - ĐH Hải Phòng</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="../css/style.css">
@@ -23,7 +23,7 @@
                     <a href="../" class="bg-green-700 hover:bg-green-600 px-3 py-1 rounded text-sm transition">
                         <i class="fas fa-arrow-left mr-1"></i> Trang chủ
                     </a>
-                    <span class="font-bold text-lg border-l border-green-600 pl-3">Quản Lý Danh Mục</span>
+                    <span class="font-bold text-lg border-l border-green-600 pl-3">Danh Mục & Tác Giả</span>
                 </div>
                 <div class="flex items-center space-x-4">
                     <span id="user-display" class="text-sm font-medium">...</span>
@@ -33,31 +33,62 @@
         </nav>
 
         <main class="flex-grow container mx-auto px-4 py-6 max-w-4xl">
-            <!-- THANH CÔNG CỤ -->
-            <div class="bg-white p-4 rounded-lg shadow mb-6 flex justify-between items-center">
-                <button onclick="openModal()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded flex items-center shadow transition">
-                    <i class="fas fa-plus mr-2"></i> Thêm Danh Mục
-                </button>
+            
+            <!-- PHẦN DANH MỤC BÀI BÁO -->
+            <div class="mb-10">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-bold text-gray-800 border-l-4 border-green-600 pl-3">Quản Lý Danh Mục</h2>
+                    <button onclick="openModal()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded flex items-center shadow transition">
+                        <i class="fas fa-plus mr-2"></i> Thêm Danh Mục
+                    </button>
+                </div>
+
+                <div class="bg-white rounded-lg shadow overflow-hidden">
+                    <table class="min-w-full leading-normal">
+                        <thead class="bg-gray-100 text-gray-600 uppercase text-xs font-semibold">
+                            <tr>
+                                <th class="px-5 py-3 text-center w-16">TT</th>
+                                <th class="px-5 py-3 text-left">Tên Danh Mục</th>
+                                <th class="px-5 py-3 text-center w-32">Số Giờ Quy Đổi</th>
+                                <th class="px-5 py-3 text-center w-28">Thao Tác</th>
+                            </tr>
+                        </thead>
+                        <tbody id="table-body"></tbody>
+                    </table>
+                    <div id="empty-state" class="hidden p-8 text-center text-gray-500">
+                        <i class="fas fa-list-alt text-4xl mb-3 text-gray-300"></i><br>
+                        <p class="mb-4 mt-2">Chưa có danh mục nào trong hệ thống.</p>
+                        <button onclick="window.seedDefaultCategories()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded shadow transition">
+                            <i class="fas fa-magic mr-1"></i> Khởi tạo danh mục cũ
+                        </button>
+                    </div>
+                </div>
             </div>
 
-            <div class="bg-white rounded-lg shadow overflow-hidden">
-                <table class="min-w-full leading-normal">
-                    <thead class="bg-gray-100 text-gray-600 uppercase text-xs font-semibold">
-                        <tr>
-                            <th class="px-5 py-3 text-center w-16">TT</th>
-                            <th class="px-5 py-3 text-left">Tên Danh Mục</th>
-                            <th class="px-5 py-3 text-center w-32">Số Giờ Quy Đổi</th>
-                            <th class="px-5 py-3 text-center w-28">Thao Tác</th>
-                        </tr>
-                    </thead>
-                    <tbody id="table-body"></tbody>
-                </table>
-                <div id="empty-state" class="hidden p-8 text-center text-gray-500">
-                    <i class="fas fa-list-alt text-4xl mb-3 text-gray-300"></i><br>
-                    <p class="mb-4 mt-2">Chưa có danh mục nào trong hệ thống.</p>
-                    <button onclick="window.seedDefaultCategories()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded shadow transition">
-                        <i class="fas fa-magic mr-1"></i> Khởi tạo danh mục cũ
+            <!-- PHẦN DANH SÁCH TÁC GIẢ -->
+            <div>
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-bold text-gray-800 border-l-4 border-blue-600 pl-3">Quản Lý Tác Giả</h2>
+                    <button onclick="openAuthorModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded flex items-center shadow transition">
+                        <i class="fas fa-plus mr-2"></i> Thêm Tác Giả
                     </button>
+                </div>
+
+                <div class="bg-white rounded-lg shadow overflow-hidden">
+                    <table class="min-w-full leading-normal">
+                        <thead class="bg-gray-100 text-gray-600 uppercase text-xs font-semibold">
+                            <tr>
+                                <th class="px-5 py-3 text-center w-16">TT</th>
+                                <th class="px-5 py-3 text-left">Tên Tác Giả</th>
+                                <th class="px-5 py-3 text-center w-28">Thao Tác</th>
+                            </tr>
+                        </thead>
+                        <tbody id="author-table-body"></tbody>
+                    </table>
+                    <div id="author-empty-state" class="hidden p-8 text-center text-gray-500">
+                        <i class="fas fa-users text-4xl mb-3 text-gray-300"></i><br>
+                        Chưa có tác giả nào trong hệ thống.
+                    </div>
                 </div>
             </div>
         </main>
@@ -82,6 +113,26 @@
                 <div class="flex justify-end pt-4 gap-2">
                     <button type="button" onclick="closeModal()" class="bg-gray-200 text-gray-700 px-4 py-2 rounded hover:bg-gray-300">Hủy</button>
                     <button type="submit" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Lưu dữ liệu</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL TÁC GIẢ -->
+    <div id="author-modal" class="fixed inset-0 bg-gray-900 bg-opacity-50 hidden z-50 flex items-center justify-center">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-md p-6 m-4">
+            <div class="flex justify-between items-center mb-4 border-b pb-2">
+                <h3 id="author-modal-title" class="text-xl font-bold">Thêm Tác Giả</h3>
+                <button onclick="closeAuthorModal()" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button>
+            </div>
+            <form id="form-author" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Tên Tác Giả</label>
+                    <input type="text" id="author-name" class="w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none" required placeholder="VD: Nguyễn Văn A">
+                </div>
+                <div class="flex justify-end pt-4 gap-2">
+                    <button type="button" onclick="closeAuthorModal()" class="bg-gray-200 text-gray-700 px-4 py-2 rounded hover:bg-gray-300">Hủy</button>
+                    <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Lưu dữ liệu</button>
                 </div>
             </form>
         </div>
