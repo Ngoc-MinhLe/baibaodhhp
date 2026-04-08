@@ -170,7 +170,8 @@ function renderTable() {
     const paginationControls = document.getElementById('pagination-controls');
     
     const searchTerm = document.getElementById('search-input').value.toLowerCase();
-    const filterAuthor = document.getElementById('filter-author').value.trim().toLowerCase();
+    const filterAuthorInput = document.getElementById('filter-author').value.trim();
+    const filterAuthor = filterAuthorInput.toLowerCase();
     const filterYear = document.getElementById('filter-year').value;
 
     tbody.innerHTML = '';
@@ -191,7 +192,7 @@ function renderTable() {
     });
 
     // Tính tổng giờ TRƯỚC KHI cắt trang
-    filteredData.forEach(item => totalSum += getMyHoursValue(item));
+    filteredData.forEach(item => totalSum += getMyHoursValue(item, filterAuthorInput));
     document.getElementById('total-hours-display').textContent = Number(totalSum.toFixed(2));
 
     if (filteredData.length === 0) {
@@ -209,7 +210,7 @@ function renderTable() {
         
         paginatedData.forEach((item, index) => {
             const stt = (currentPage - 1) * itemsPerPage + index + 1;
-            renderRow(item, stt, tbody);
+            renderRow(item, stt, tbody, filterAuthorInput);
         });
         
         renderPagination(totalItems, totalPages, paginationControls);
@@ -240,39 +241,39 @@ function renderPagination(totalItems, totalPages, container) {
 window.changePage = (page) => { currentPage = page; renderTable(); };
 
 // Lấy giá trị số giờ để tính tổng
-function getMyHoursValue(item) {
+function getMyHoursValue(item, targetAuthorName = '') {
     const totalHours = item.soGioQuyDoi || 0;
     const authors = Array.isArray(item.tacGia) ? item.tacGia : [item.tacGia];
     const authorCount = authors.length || 1;
     
-    // So sánh tên (không phân biệt hoa thường)
-    const myName = (currentUserData.authorName || currentUser.displayName || "").trim().toLowerCase();
+    // Nếu đang lọc theo tác giả thì tính cho tác giả đó, nếu không thì tính cho user hiện tại
+    const targetName = targetAuthorName ? targetAuthorName.toLowerCase() : (currentUserData.authorName || currentUser.displayName || "").trim().toLowerCase();
     const mainAuthorName = (item.tacGiaChinh || authors[0] || "").trim().toLowerCase();
 
-    let isMain = mainAuthorName === myName;
-    let isCoAuthor = !isMain && authors.some(a => a.trim().toLowerCase() === myName);
+    let isMain = mainAuthorName === targetName;
+    let isCoAuthor = !isMain && authors.some(a => a.trim().toLowerCase() === targetName);
 
     if (isMain) {
         return (1/3 * totalHours) + ((2/3 * totalHours) / authorCount);
     } else if (isCoAuthor) {
         return (2/3 * totalHours) / authorCount;
     } else {
-        return totalHours;
+        return targetAuthorName ? 0 : totalHours;
     }
 }
 
 // Tính toán số giờ hiển thị dựa trên Vai trò tác giả
-function calculateMyHoursDisplay(item, returnType = 'html') {
+function calculateMyHoursDisplay(item, returnType = 'html', targetAuthorName = '') {
     const totalHours = item.soGioQuyDoi || 0;
     const authors = Array.isArray(item.tacGia) ? item.tacGia : [item.tacGia];
     
-    const myName = (currentUserData.authorName || currentUser.displayName || "").trim().toLowerCase();
+    const targetName = targetAuthorName ? targetAuthorName.toLowerCase() : (currentUserData.authorName || currentUser.displayName || "").trim().toLowerCase();
     const mainAuthorName = (item.tacGiaChinh || authors[0] || "").trim().toLowerCase();
 
-    let isMain = mainAuthorName === myName;
-    let isCoAuthor = !isMain && authors.some(a => a.trim().toLowerCase() === myName);
+    let isMain = mainAuthorName === targetName;
+    let isCoAuthor = !isMain && authors.some(a => a.trim().toLowerCase() === targetName);
 
-    let myHours = getMyHoursValue(item);
+    let myHours = getMyHoursValue(item, targetAuthorName);
     
     if (isMain) {
         if(returnType === 'print') return `${Number(myHours.toFixed(2))} (TG Chính)`;
@@ -288,7 +289,7 @@ function calculateMyHoursDisplay(item, returnType = 'html') {
     }
 }
 
-function renderRow(item, index, tbody) {
+function renderRow(item, index, tbody, targetAuthorName = '') {
     const tr = document.createElement('tr');
     tr.className = "border-b hover:bg-gray-50 transition";
     tr.dataset.id = item.id; 
@@ -310,7 +311,7 @@ function renderRow(item, index, tbody) {
     let tacGiaDisplay = Array.isArray(item.tacGia) ? item.tacGia.map(a => a === mainAuthorName ? `<span class="font-bold underline text-blue-800" title="Tác giả chính">${a}</span>` : a).join(', ') : item.tacGia;
     
     // Tính số giờ hiển thị
-    const hoursDisplay = calculateMyHoursDisplay(item, 'html');
+    const hoursDisplay = calculateMyHoursDisplay(item, 'html', targetAuthorName);
 
     tr.innerHTML = `
         <td class="text-center py-3">
@@ -361,13 +362,15 @@ window.togglePreview = () => {
         p.classList.remove('preview-mode');
         m.classList.remove('hidden'); m.classList.add('flex');
     } else {
+        const filterAuthorInput = document.getElementById('filter-author').value.trim();
+        const filterAuthor = filterAuthorInput.toLowerCase();
+
         const checkedIds = Array.from(window.selectedArticleIds);
         let itemsToPrint = [];
         if (checkedIds.length > 0) {
             itemsToPrint = allArticles.filter(item => checkedIds.includes(item.id));
         } else {
             const searchTerm = document.getElementById('search-input').value.toLowerCase();
-            const filterAuthor = document.getElementById('filter-author').value.trim().toLowerCase();
             const filterYear = document.getElementById('filter-year').value;
             itemsToPrint = allArticles.filter(item => {
                 const matchesSearch = (item.tenBai || '').toLowerCase().includes(searchTerm) || 
@@ -393,7 +396,7 @@ window.togglePreview = () => {
             const notePrint = item.ghiChu ? `<br><span style="font-style: italic; font-size: 0.9em; color: #555;">(Ghi chú: ${item.ghiChu})</span>` : '';
             const mainA = item.tacGiaChinh || (Array.isArray(item.tacGia) ? item.tacGia[0] : item.tacGia);
             const tgPrint = Array.isArray(item.tacGia) ? item.tacGia.map(a => a === mainA ? `<u><b>${a}</b></u>` : a).join(', ') : item.tacGia;
-            const printHours = calculateMyHoursDisplay(item, 'print');
+            const printHours = calculateMyHoursDisplay(item, 'print', filterAuthorInput);
 
             printBody.insertAdjacentHTML('beforeend', `
                 <tr>
