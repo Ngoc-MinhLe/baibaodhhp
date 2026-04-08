@@ -196,11 +196,8 @@ function renderTable() {
         if (filterAuthorInput !== '') {
             // Lọc theo tác giả cụ thể -> Cộng dồn số giờ đã chia của tác giả đó
             totalSum += getMyHoursValue(item, filterAuthorInput);
-        } else if (!hasPermission(userPerms, 'articles', 'view_all')) {
-            // User thường (chỉ xem bài của mình) -> Cộng số giờ đã chia của user
-            totalSum += getMyHoursValue(item, currentUserData.authorName || currentUser.displayName || "");
         } else {
-            // Admin xem toàn khoa (không lọc) -> Cộng tổng số giờ gốc của toàn bộ bài báo
+            // Không lọc tác giả -> Cộng tổng số giờ gốc của toàn bộ bài báo
             totalSum += (item.soGioQuyDoi || 0);
         }
     });
@@ -254,11 +251,13 @@ window.changePage = (page) => { currentPage = page; renderTable(); };
 // Lấy giá trị số giờ để tính tổng
 function getMyHoursValue(item, targetAuthorName = '') {
     const totalHours = item.soGioQuyDoi || 0;
+    
+    if (!targetAuthorName) return totalHours;
+
     const authors = Array.isArray(item.tacGia) ? item.tacGia : [item.tacGia];
     const authorCount = authors.length || 1;
     
-    // Nếu đang lọc theo tác giả thì tính cho tác giả đó, nếu không thì tính cho user hiện tại
-    const targetName = targetAuthorName ? targetAuthorName.toLowerCase() : (currentUserData.authorName || currentUser.displayName || "").trim().toLowerCase();
+    const targetName = targetAuthorName.toLowerCase();
     const mainAuthorName = (item.tacGiaChinh || authors[0] || "").trim().toLowerCase();
 
     let isMain = mainAuthorName === targetName;
@@ -269,16 +268,22 @@ function getMyHoursValue(item, targetAuthorName = '') {
     } else if (isCoAuthor) {
         return (2/3 * totalHours) / authorCount;
     } else {
-        return targetAuthorName ? 0 : totalHours;
+        return 0;
     }
 }
 
 // Tính toán số giờ hiển thị dựa trên Vai trò tác giả
 function calculateMyHoursDisplay(item, returnType = 'html', targetAuthorName = '') {
     const totalHours = item.soGioQuyDoi || 0;
+
+    if (!targetAuthorName) {
+        if(returnType === 'print') return `${totalHours} (Tổng)`;
+        return `<span class="font-bold text-gray-700">${totalHours}</span> <div class="text-[10px] text-red-400">(Tổng giờ)</div>`;
+    }
+
     const authors = Array.isArray(item.tacGia) ? item.tacGia : [item.tacGia];
     
-    const targetName = targetAuthorName ? targetAuthorName.toLowerCase() : (currentUserData.authorName || currentUser.displayName || "").trim().toLowerCase();
+    const targetName = targetAuthorName.toLowerCase();
     const mainAuthorName = (item.tacGiaChinh || authors[0] || "").trim().toLowerCase();
 
     let isMain = mainAuthorName === targetName;
