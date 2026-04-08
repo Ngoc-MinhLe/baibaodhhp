@@ -192,7 +192,18 @@ function renderTable() {
     });
 
     // Tính tổng giờ TRƯỚC KHI cắt trang
-    filteredData.forEach(item => totalSum += getMyHoursValue(item, filterAuthorInput));
+    filteredData.forEach(item => {
+        if (filterAuthorInput !== '') {
+            // Lọc theo tác giả cụ thể -> Cộng dồn số giờ đã chia của tác giả đó
+            totalSum += getMyHoursValue(item, filterAuthorInput);
+        } else if (!hasPermission(userPerms, 'articles', 'view_all')) {
+            // User thường (chỉ xem bài của mình) -> Cộng số giờ đã chia của user
+            totalSum += getMyHoursValue(item, currentUserData.authorName || currentUser.displayName || "");
+        } else {
+            // Admin xem toàn khoa (không lọc) -> Cộng tổng số giờ gốc của toàn bộ bài báo
+            totalSum += (item.soGioQuyDoi || 0);
+        }
+    });
     document.getElementById('total-hours-display').textContent = Number(totalSum.toFixed(2));
 
     if (filteredData.length === 0) {
